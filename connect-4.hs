@@ -22,3 +22,10 @@ data Turn = PlayerTurn | AiTurn
 
 {- Game State -}
 data GameState = GameState Field Turn
+
+{- Moves -}
+type Move = Int -- field column
+
+possibleMoves :: GameState -> [Move]
+possibleMoves = undefined
+
