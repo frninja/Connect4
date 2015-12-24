@@ -78,13 +78,21 @@ winner (GameState field _)
         (leftUpRightDownMin, leftUpRightDownMax) =  minMaxFind $ concatMap (map msum) $ map group $ transpose $ skew $ reverse field 
 
 allNotEmpty :: Field -> Bool
-allNotEmpty = undefined
+allNotEmpty f = all (lineAllNotEmpty) f
 
-msum :: [FieldCell] -> Int
-msum = undefined
+lineAllNotEmpty :: [FieldCell] -> Bool
+lineAllNotEmpty [] = True
+lineAllNotEmpty (EmptyCell:fcs) = False
+lineAllNotEmpty (_:fcs) = True && (lineAllNotEmpty fcs)
+
+msum :: [FieldCell]->Int
+msum [] = 0
+msum (EmptyCell:fcs) = msum fcs
+msum (PlayerCell:fcs) = 1+(msum fcs)
+msum (AiCell:fcs) = (msum fcs)-1 
 
 minMaxFind :: (Ord a, Eq a)=>[a]->(a,a)
-minMaxFind = undefined
+minMaxFind xs = (minimum xs, maximum xs)
 
 skew :: Field -> Field
 skew = undefined
