@@ -1,5 +1,3 @@
--- {-# LANGUAGE LambdaCase #-}
-
 {- Connect4 Game 
     by 
      Oleg Batashov
@@ -8,6 +6,7 @@
 -}
 
 import Data.Maybe
+import Data.List
 
 {- Game Field -}
 
@@ -16,7 +15,7 @@ gameFieldWidth  = 7
 gameFieldHeight = 6
 
 {- Field cell -}
-data FieldCell = EmptyField | PlayerField | AiField
+data FieldCell = EmptyCell | PlayerCell | AiCell
     deriving (Show, Eq)
 
 type Field = [[FieldCell]]
@@ -33,7 +32,7 @@ type Move = Int -- field column
 possibleMoves :: GameState -> [Move]
 possibleMoves gs@(GameState [cols] _) 
   | isNothing $ winner gs = map fst $ filter (\(_, x) -> case x of
-                                                  EmptyField    -> True
+                                                  EmptyCell    -> True
                                                   _             -> False)
                                     $ zip [0..gameFieldWidth] cols
   | otherwise = []
@@ -49,14 +48,12 @@ makeMove gs@(GameState field currentTurn) (Just moveCol)
         nextTurn AiTurn = PlayerTurn
         col = field !! moveCol
         notEmptyElems = filter (\x -> case x of 
-                                        EmptyField -> False
+                                        EmptyCell -> False
                                         _          -> True) col
         notEmptyCount = length notEmptyElems
         pre = take moveCol field
         post = reverse $ take (gameFieldWidth - moveCol - 1) $ reverse field
-        newCol = [(replicate (gameFieldHeight - notEmptyCount - 1) EmptyField)] --  ++ [currentTurn] ++ notEmptyElems]
-
-  
+        newCol = [(replicate (gameFieldHeight - notEmptyCount - 1) EmptyCell)]
 
 winner :: GameState -> Maybe FieldCell
 winner = undefined
