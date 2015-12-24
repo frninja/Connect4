@@ -1,9 +1,13 @@
+{-# LANGUAGE LambdaCase #-}
+
 {- Connect4 Game 
     by 
      Oleg Batashov
      Nina Antonova
      Irina Prikhodko
 -}
+
+import Data.Maybe
 
 {- Game Field -}
 
@@ -27,5 +31,14 @@ data GameState = GameState Field Turn
 type Move = Int -- field column
 
 possibleMoves :: GameState -> [Move]
-possibleMoves = undefined
+possibleMoves gs@(GameState [cols] _) 
+  | isNothing $ winner gs = map fst $ filter (\case  
+                                                 (_,EmptyField) -> True
+                                                  _          -> False)
+                                    $ zip [0..gameFieldWidth] cols
+  | otherwise = []
+  
+
+winner :: GameState -> Maybe FieldCell
+winner = undefined
 
