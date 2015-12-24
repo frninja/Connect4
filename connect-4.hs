@@ -95,4 +95,9 @@ minMaxFind :: (Ord a, Eq a)=>[a]->(a,a)
 minMaxFind xs = (minimum xs, maximum xs)
 
 skew :: Field -> Field
-skew = undefined
+skew fcs = _skew fcs 0 ((length $ head fcs)-1)
+
+_skew :: Field -> Int -> Int -> Field
+_skew [] _ _ = []
+_skew (fc:fcs) leftgaps rightgaps = ((replicate leftgaps EmptyCell) ++ fc ++ (replicate rightgaps EmptyCell)) : _skew fcs (leftgaps+1) (rightgaps-1)
+	
