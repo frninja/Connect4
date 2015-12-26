@@ -101,3 +101,14 @@ _skew :: Field -> Int -> Int -> Field
 _skew [] _ _ = []
 _skew (fc:fcs) leftgaps rightgaps = ((replicate leftgaps EmptyCell) ++ fc ++ (replicate rightgaps EmptyCell)) : _skew fcs (leftgaps+1) (rightgaps-1)
 	
+	
+eval :: GameState -> Int
+eval gs@(GameState field _) = _eval field $ winner gs	
+	
+_eval :: Field -> Maybe Winner -> Int
+_eval field (Nothing) = sum ( zipWith (*) foundation (map msum $ field))
+    where  
+        foundation = [1..((gameFieldWidth+1) `div` 2)] ++ (reverse [1..(gameFieldWidth `div` 2)])
+_eval _ (Just AI) = 0 - ((maxBound::Int) `div` 2)
+_eval _ (Just Player) = (maxBound::Int) `div` 2
+_eval _ (Just Draw) = 0	
