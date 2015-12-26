@@ -114,7 +114,6 @@ main = do
    startGame gen
  
 fieldSize@(fieldWidth, fieldHeight) = (7, 6) :: (Int, Int)
-mineCount = 0 :: Int
  
 createField :: FieldUI
 createField = Data.Map.empty
@@ -130,7 +129,7 @@ data GameStateUI = GS
     }
  
 startGame :: StdGen -> IO ()
-startGame gen = play (InWindow "Hsweeper" windowSize (240, 160)) white 30 (initState gen) renderer handler updater
+startGame gen = play (InWindow "Connect4" (550,600) (200,0)) white 30 (initState gen) renderer handler updater
  
 windowSize = both (* (round cellSize)) fieldSize
 cellSize = 80 :: Float
