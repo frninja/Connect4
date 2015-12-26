@@ -72,8 +72,8 @@ winner (GameState field _)
     | otherwise = Nothing
     where
 	    
-        (horisMin, horisMax) = minMaxFind $ concatMap (map msum) $ map group $ transpose field
-        (vertMin, vertMax) = minMaxFind $ concatMap (map msum) $ map group field
+        (vertMin, vertMax) = minMaxFind $ concatMap (map msum) $ map group $ transpose field
+        (horiMin, horiMax) = minMaxFind $ concatMap (map msum) $ map group field
         (leftDownRightUpMin, leftDownRightUpMax) = minMaxFind $ concatMap (map msum) $ map group $ transpose $ skew field
         (leftUpRightDownMin, leftUpRightDownMax) =  minMaxFind $ concatMap (map msum) $ map group $ transpose $ skew $ reverse field 
 
