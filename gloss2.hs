@@ -3,16 +3,11 @@ import Data.Set
 import Graphics.Gloss
 import Graphics.Gloss.Data.ViewPort
 import Graphics.Gloss.Interface.Pure.Game
-import System.Random
-import System.Random.Shuffle (shuffle')
-
 import Control.Monad
-
 import Graphics.Gloss.Game (bmp)
-
-
 import Data.Maybe
 import Data.List 
+import System.Random
 
 {- Game Field -}
 
@@ -21,7 +16,7 @@ gameFieldWidth  = 7
 gameFieldHeight = 6
 
 {- Field cell -}
-data FieldCell = EmptyCell | PlayerCell | AiCell
+data FieldCell = EmptyCell | PlayerCell | AiCell | ArrowCell
     deriving (Show, Eq)
 	
 data Winner = AI | Player | Draw
@@ -113,10 +108,17 @@ main = do
    gen <- getStdGen
    startGame gen
  
-fieldSize@(fieldWidth, fieldHeight) = (7, 6) :: (Int, Int)
+fieldSize@(fieldWidth, fieldHeight) = (7,7) :: (Int, Int)
+mineCount = 0 :: Int
  
 createField :: FieldUI
-createField = Data.Map.empty
+createField = Data.Map.fromList(arrowLine ++ initBoard)
+
+arrowLine :: [(Cell, FieldCell)] 
+arrowLine = [((x, gameFieldHeight),ArrowCell) | x<-[0..gameFieldWidth-1]]
+
+initBoard :: [(Cell, FieldCell)]
+initBoard = [((x, y), EmptyCell) | x<-[0..gameFieldWidth-1], y<-[0..gameFieldHeight-1]]
  
 type FieldUI = Map Cell FieldCell
 type Cell = (Int, Int)
@@ -127,10 +129,10 @@ data GameStateUI = GS
     , score_ai :: Int
     , current_turn :: Turn
     }
- 
+
+-- Нужно инициализировать все, кроме стрелок(Nothing) на EmptyCell
 startGame :: StdGen -> IO ()
 startGame gen = play (InWindow "Connect4" (550,600) (200,0)) white 30 (initState gen) renderer handler updater
- 
 windowSize = both (* (round cellSize)) fieldSize
 cellSize = 80 :: Float
  
@@ -143,6 +145,9 @@ updater _ = id
  
 cellToScreen = both ((* cellSize) . fromIntegral)
 
+--Здесь: нажатие на верхние стрелки :
+--		 проверка соответствующего столбца, поиск незанятой самой нижней ячейки и ее заполнение
+-- 		 далее вызов функции, которая ставит ход Ai (rendere)
 handler (EventKey (MouseButton LeftButton) Down _ mouse) gs@GS
     { field = field
     } 
@@ -162,16 +167,13 @@ handler (EventKey (MouseButton LeftButton) Down _ mouse) gs@GS
 handler _ gs = gs
 screenToCell = both (round . (/ cellSize)) . invertViewPort viewPort 
 
-
-
-cellStatePicture :: IO Picture
-cellStatePicture = loadBMP "arrow.bmp"
- 
+-- Сейчас только вывод по Map соответствующих картинок
+-- добавить ход вызов хода компа после рендеринга
 renderer GS { field = field } = applyViewPortToPicture viewPort $ pictures $ cells ++ grid where
     grid = [uncurry translate (cellToScreen (x, y)) $ color black $ rectangleWire cellSize cellSize | x <- [0 .. fieldWidth - 1], y <- [0 .. fieldHeight - 1]]
     cells = [uncurry translate (cellToScreen (x, y)) $ drawCell x y | x <- [0 .. fieldWidth - 1], y <- [0 .. fieldHeight - 1]]
     drawCell x y = case Data.Map.lookup (x, y) field of
-        Nothing         -> pictures [ color red $ rectangleSolid cellSize cellSize
+        Just ArrowCell         -> pictures [ color red $ rectangleSolid cellSize cellSize
                                     , scale 0.4 0.4 $ bmp "arrow.bmp"
                                     ]
         Just EmptyCell      -> pictures [ color red $ rectangleSolid cellSize cellSize
