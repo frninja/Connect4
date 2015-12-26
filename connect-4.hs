@@ -15,11 +15,11 @@ gameFieldWidth  = 7
 gameFieldHeight = 6
 
 {- Field cell -}
-data FieldCell = EmptyCell | PlayerCell | AiCell
+data FieldCell = EmptyCell | PlayerCell | AiCell | ArrowCell
     deriving (Show, Eq)
-	
+    
 data Winner = AI | Player | Draw
-	deriving (Show, Eq)
+    deriving (Show, Eq)
 
 type Field = [[FieldCell]]
 
@@ -71,7 +71,7 @@ winner (GameState field _)
     | allNotEmpty field = Just Draw
     | otherwise = Nothing
     where
-	    
+        
         (horisMin, horisMax) = minMaxFind $ concatMap (map msum) $ map group $ transpose field
         (vertMin, vertMax) = minMaxFind $ concatMap (map msum) $ map group field
         (leftDownRightUpMin, leftDownRightUpMax) = minMaxFind $ concatMap (map msum) $ map group $ transpose $ skew field
@@ -100,13 +100,61 @@ skew fcs = _skew fcs 0 ((length $ head fcs)-1)
 _skew :: Field -> Int -> Int -> Field
 _skew [] _ _ = []
 _skew (fc:fcs) leftgaps rightgaps = ((replicate leftgaps EmptyCell) ++ fc ++ (replicate rightgaps EmptyCell)) : _skew fcs (leftgaps+1) (rightgaps-1)
-	
+    
 eval :: GameState -> Int
-eval gs@(GameState field _) = _eval field $ winner gs	
-	
+eval gs@(GameState field _) = _eval field $ winner gs    
+    
 _eval :: Field -> Maybe Winner -> Int
 _eval field (Nothing) = sum ( zipWith (*) foundation (map msum $ field))
     where  
         foundation = [1..((gameFieldWidth+1) `div` 2)] ++ (reverse [1..(gameFieldWidth `div` 2)])
-_eval _ (Just Draw) = 0	
+_eval _ (Just Draw) = 0    
 _eval _ (Just _) = (maxBound::Int) `div` 2
+
+--(depth, alpha, beta, move, failFast)
+type ABSearchData = (Int, Int, Int, Move, Bool)
+
+alphaBetaSearch :: GameState -> Int -> Maybe Move
+alphaBetaSearch gs depth
+  | length posMoves == 0 = Nothing
+  | depth <= 0 = Just $ head posMoves
+  | isNothing $ winner gs = Just move
+  | otherwise = Nothing
+  where
+    posMoves            = possibleMoves gs
+    bestMove            = if depth <= 0 then head posMoves else fromJust $ alphaBetaSearch gs $ depth - 1
+    moves               = bestMove : (delete bestMove posMoves)
+    initABSDataVal      = (depth, (minBound::Int) `div` 4, (maxBound::Int) `div` 4, head moves, False)
+    foldABSData         = zip moves $ replicate (length moves) gs
+    (_, _, _, move, _)  = foldl alphaBetaSearchUpdate initABSDataVal foldABSData
+    
+alphaBetaSearchUpdate :: ABSearchData -> (Move, GameState) -> ABSearchData
+alphaBetaSearchUpdate absdata@(_, _, _, _, True) _ = absdata
+alphaBetaSearchUpdate absdata@(depth, alpha, beta, bestMove, False) (move, gs)
+    | score >= beta = (depth, alpha, beta, move, True)
+    | score > alpha = (depth, score, beta, move, False)
+    | otherwise = absdata
+    where
+        score = -(alphaBetaSearchCalcScore (makeMove gs (Just move)) (-beta) (-alpha) (depth-1))
+        
+alphaBetaSearchCalcScore :: GameState -> Int -> Int -> Int -> Int
+alphaBetaSearchCalcScore gs@(GameState _ turn) _ _ 0 = (eval gs) * case turn of
+                                                                     AiTurn     -> -1
+                                                                     PlayerTurn -> 1
+alphaBetaSearchCalcScore gs alpha beta depth = val
+    where
+      posMoves          = possibleMoves gs
+      initVal           = (depth, alpha, beta, alpha, False)
+      toFold            = zip posMoves $ replicate (length posMoves) gs
+      (_, _, _, val, _) = foldl alphaBetaSearchCalcScoreUpdate initVal toFold
+        
+--(depth, alpha, beta, returnVal, failFast)
+type AlphaBetaSearchCalcScoreData = (Int, Int, Int, Int, Bool)
+alphaBetaSearchCalcScoreUpdate :: AlphaBetaSearchCalcScoreData -> (Move, GameState) -> AlphaBetaSearchCalcScoreData
+alphaBetaSearchCalcScoreUpdate abscsdata@(_, _, _, _, True) _ = abscsdata
+alphaBetaSearchCalcScoreUpdate abscsdata@(depth, alpha, beta, returnVal, False) (move, gs)
+    | score >= beta = (depth, alpha, beta, score, True)
+    | score > alpha = (depth, score, beta, score, False)
+    | otherwise = abscsdata
+    where
+        score = -(alphaBetaSearchCalcScore (makeMove gs (Just move)) (-beta) (-alpha) (depth-1))
