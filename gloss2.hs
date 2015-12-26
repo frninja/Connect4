@@ -34,11 +34,11 @@ data GameState = GameState Field Turn
 type Move = Int -- field column
 
 possibleMoves :: GameState -> [Move]
-possibleMoves gs@(GameState [cols] _) 
-  | isNothing $ winner gs = Data.List.map fst $ Data.List.filter (\(_, x) -> case x of
+possibleMoves gs@(GameState field _) 
+  | isNothing $ winner gs = Data.List.map fst $ Data.List.filter (\(_, x) -> case head x of
                                                   EmptyCell    -> True
                                                   _             -> False)
-                                    $ zip [0..gameFieldWidth] cols
+                                    $ zip [0..gameFieldWidth - 1] field
   | otherwise = []
   
 makeMove :: GameState -> Maybe Move -> GameState
@@ -50,6 +50,8 @@ makeMove gs@(GameState field currentTurn) (Just moveCol)
     where
         nextTurn PlayerTurn = AiTurn
         nextTurn AiTurn = PlayerTurn
+        cellTurn PlayerTurn = PlayerCell
+        cellTurn AiTurn = AiCell
         col = field !! moveCol
         notEmptyElems = Data.List.filter (\x -> case x of 
                                         EmptyCell -> False
@@ -57,7 +59,7 @@ makeMove gs@(GameState field currentTurn) (Just moveCol)
         notEmptyCount = length notEmptyElems
         pre = take moveCol field
         post = reverse $ take (gameFieldWidth - moveCol - 1) $ reverse field
-        newCol = [(replicate (gameFieldHeight - notEmptyCount - 1) EmptyCell)]
+        newCol = [(replicate (gameFieldHeight - notEmptyCount - 1) EmptyCell) ++ [cellTurn currentTurn] ++ notEmptyElems]
 
 winner :: GameState -> Maybe Winner
 winner (GameState field _) 
@@ -125,10 +127,31 @@ type Cell = (Int, Int)
  
 data GameStateUI = GS
     { field    :: FieldUI
-    , score_human :: Int
-    , score_ai :: Int
     , current_turn :: Turn
     }
+    
+    
+-- Converter for GameState
+gsUI2gs :: GameStateUI -> GameState
+gsUI2gs (GS fieldUI turn) = GameState (fieldUI2field fieldUI) turn
+
+
+gs2gsUI :: GameState -> GameStateUI
+gs2gsUI (GameState field turn) = GS (field2fieldUI field) turn
+
+
+-- Converter for Field
+fieldUI2field :: FieldUI -> Field
+fieldUI2field fieldUI = 
+  [ [fromJust $ Data.Map.lookup (x, y) fieldUI | y <- [0..gameFieldHeight - 1] ] | x <- [0..gameFieldWidth -1]]
+
+field2fieldUI :: Field -> FieldUI
+field2fieldUI field = Data.Map.fromList $ (Data.Map.toList workField) ++ arrowLine
+  where
+    workField = snd $ Data.List.foldr rowsFold (0, Data.Map.empty) field
+    rowsFold cols (rowNum, acc) = (rowNum + 1, snd $ Data.List.foldr inserter (0, acc) cols)
+      where
+        inserter col (colNum, acc) = (colNum + 1, Data.Map.insert (rowNum, colNum) col acc)
 
 -- Нужно инициализировать все, кроме стрелок(Nothing) на EmptyCell
 startGame :: StdGen -> IO ()
@@ -136,7 +159,7 @@ startGame gen = play (InWindow "Connect4" (550,600) (200,0)) white 30 (initState
 windowSize = both (* (round cellSize)) fieldSize
 cellSize = 80 :: Float
  
-initState gen = GS createField 0 0  PlayerTurn
+initState gen = GS createField PlayerTurn
  
 both :: (a -> b) -> (a, a) -> (b, b)
 both f (a, b) = (f a, f b) 
@@ -151,18 +174,12 @@ cellToScreen = both ((* cellSize) . fromIntegral)
 handler (EventKey (MouseButton LeftButton) Down _ mouse) gs@GS
     { field = field
     } 
-    | fst coord >= gameFieldWidth -1 && snd coord >= gameFieldHeight - 1 = case Data.Map.lookup coord field of
-        Nothing -> gs { 
-          field = Data.Map.insert coord PlayerCell field 
-          , score_human = 0
-          , score_ai = 0
-          , current_turn = AiTurn }
-        Just _ -> gs { 
-          field =  Data.Map.insert coord AiCell field
-          , score_human = 0
-          , score_ai = 0
-          , current_turn = AiTurn }
-          --_ -> gs
+    | snd coord == gameFieldHeight = --case Data.Map.lookup coord field of
+        gs2gsUI $ makeMove (gsUI2gs gs) (Just $ fst coord)
+	    --Nothing -> gs { 
+        --  field = Data.Map.insert coord PlayerCell field, current_turn = AiTurn }
+        --Just _ -> gs { 
+        --  field =  Data.Map.insert coord AiCell field, current_turn = AiTurn }
         where coord = screenToCell mouse
 handler _ gs = gs
 screenToCell = both (round . (/ cellSize)) . invertViewPort viewPort 
