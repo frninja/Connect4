@@ -26,18 +26,18 @@ type Field = [[FieldCell]]
 
 {- Turn -}
 data Turn = PlayerTurn | AiTurn
+  deriving (Show, Eq)
 
 {- Game State -}
 data GameState = GameState Field Turn
+  deriving (Show, Eq)
 
 {- Moves -}
 type Move = Int -- field column
 
 possibleMoves :: GameState -> [Move]
 possibleMoves gs@(GameState field _) 
-  | isNothing $ winner gs = Data.List.map fst $ Data.List.filter (\(_, x) -> case head x of
-                                                  EmptyCell    -> True
-                                                  _             -> False)
+  | isNothing $ winner gs = Data.List.map fst $ Data.List.filter (\(_, x) -> EmptyCell `elem` x)
                                     $ zip [0..gameFieldWidth - 1] field
   | otherwise = []
   
@@ -46,21 +46,32 @@ makeMove gs Nothing = gs
 makeMove gs@(GameState field currentTurn) (Just moveCol)
     | notEmptyCount == gameFieldHeight = gs
     | not $ elem moveCol $ possibleMoves gs = gs
-    | otherwise = GameState (pre ++ newCol ++ post) (nextTurn currentTurn)
+    | otherwise = GameState (pre++newCol++post) (nextTurn currentTurn) --GameState updatedField (nextTurn currentTurn)
     where
         nextTurn PlayerTurn = AiTurn
         nextTurn AiTurn = PlayerTurn
         cellTurn PlayerTurn = PlayerCell
         cellTurn AiTurn = AiCell
+        fieldUI = field2fieldUI field
+        
+        updatedField = fieldUI2field $ Data.Map.insert (moveCol, freeRowNum) (cellTurn currentTurn) fieldUI
+        freeRowNum = fst $ head $ dropWhile cond (zip [0..gameFieldHeight - 1] (field !! moveCol))
+          where
+            cond (_, EmptyCell)  = False
+            cond (_, PlayerCell) = True
+            cond (_, AiCell)     = True
+        
         col = field !! moveCol
-        notEmptyElems = Data.List.filter (\x -> case x of 
-                                        EmptyCell -> False
-                                        _          -> True) col
+        notEmptyElems = _notEmptyElems   col
         notEmptyCount = length notEmptyElems
         pre = take moveCol field
         post = reverse $ take (gameFieldWidth - moveCol - 1) $ reverse field
-        newCol = [(replicate (gameFieldHeight - notEmptyCount - 1) EmptyCell) ++ [cellTurn currentTurn] ++ notEmptyElems]
+        --newCol = [(replicate (gameFieldHeight - notEmptyCount - 1) EmptyCell) ++ [cellTurn currentTurn] ++ notEmptyElems]
+        newCol = [ notEmptyElems ++ [cellTurn currentTurn] ++ (replicate (gameFieldHeight - notEmptyCount - 1) EmptyCell)] 
 
+_notEmptyElems col = Data.List.filter (\x -> case x of 
+                                        EmptyCell -> False
+                                        _          -> True) col
 winner :: GameState -> Maybe Winner
 winner (GameState field _) 
     | horisMin <= -4 = Just AI
@@ -148,10 +159,11 @@ fieldUI2field fieldUI =
 field2fieldUI :: Field -> FieldUI
 field2fieldUI field = Data.Map.fromList $ (Data.Map.toList workField) ++ arrowLine
   where
-    workField = snd $ Data.List.foldr rowsFold (0, Data.Map.empty) field
-    rowsFold cols (rowNum, acc) = (rowNum + 1, snd $ Data.List.foldr inserter (0, acc) cols)
+    workField = snd $ Data.List.foldl rowsFold (0, Data.Map.empty) field
+    rowsFold (rowNum, acc) cols = (rowNum + 1, snd $ Data.List.foldr inserter (0, acc) cols)
       where
         inserter col (colNum, acc) = (colNum + 1, Data.Map.insert (rowNum, colNum) col acc)
+
 
 -- Нужно инициализировать все, кроме стрелок(Nothing) на EmptyCell
 startGame :: StdGen -> IO ()
