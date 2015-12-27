@@ -140,7 +140,7 @@ data GameStateUI = GS
     { field    :: FieldUI
     , current_turn :: Turn
     }
-    
+   deriving (Show, Eq) 
     
 -- Converter for GameState
 gsUI2gs :: GameStateUI -> GameState
@@ -160,9 +160,9 @@ field2fieldUI :: Field -> FieldUI
 field2fieldUI field = Data.Map.fromList $ (Data.Map.toList workField) ++ arrowLine
   where
     workField = snd $ Data.List.foldl rowsFold (0, Data.Map.empty) field
-    rowsFold (rowNum, acc) cols = (rowNum + 1, snd $ Data.List.foldr inserter (0, acc) cols)
+    rowsFold (rowNum, acc) cols = (rowNum + 1, snd $ Data.List.foldl inserter (0, acc) cols)
       where
-        inserter col (colNum, acc) = (colNum + 1, Data.Map.insert (rowNum, colNum) col acc)
+        inserter (colNum, acc) col = (colNum + 1, Data.Map.insert (rowNum, colNum) col acc)
 
 
 -- Нужно инициализировать все, кроме стрелок(Nothing) на EmptyCell
