@@ -226,9 +226,9 @@ getField (GameState field _) = field
 
 -- Нужно инициализировать все, кроме стрелок(Nothing) на EmptyCell
 startGame :: StdGen -> IO ()
-startGame gen = play (InWindow "Connect4" (550,600) (200,0)) white 30 (initState gen) renderer handler updater
+startGame gen = play (InWindow "Connect4" (350,400) (200,0)) blue 30 (initState gen) renderer handler updater
 windowSize = both (* (round cellSize)) fieldSize
-cellSize = 80 :: Float
+cellSize = 50 :: Float
  
 initState gen = GS createField PlayerTurn
  
@@ -246,7 +246,7 @@ handler (EventKey (MouseButton LeftButton) Down _ mouse) gs@GS
     { field = field,
        current_turn = PlayerTurn
     } 
-    | snd coord == gameFieldHeight = --case Data.Map.lookup coord field of
+    | snd coord == gameFieldHeight && (fst coord) `elem` possibleMoves (gsUI2gs gs) = --case Data.Map.lookup coord field of
         let ngs = (makeMove (gsUI2gs gs) (Just $ fst coord)) in 
           let mWinner = winner ngs in
             if isNothing mWinner 
@@ -279,22 +279,37 @@ screenToCell = both (round . (/ cellSize)) . invertViewPort viewPort
 
 -- Сейчас только вывод по Map соответствующих картинок
 -- добавить ход вызов хода компа после рендеринга
-renderer GS { field = field } = applyViewPortToPicture viewPort $ pictures $ cells ++ grid where
+renderer GS { field = field, current_turn = current_turn } = case current_turn of
+  PlayerTurn -> applyViewPortToPicture viewPort $ pictures $ cells ++ grid 
+  AiTurn -> applyViewPortToPicture viewPort $ pictures $ cells ++ grid 
+  NoTurnPlayerWon -> applyViewPortToPicture viewPort2 $ pictures [bmp "player.bmp"] 
+  NoTurnAiWon -> applyViewPortToPicture viewPort2 $ pictures [bmp "ai.bmp"] 
+  NoTurnDraw -> applyViewPortToPicture viewPort2 $ pictures [bmp "draw.bmp"] 
+  
+  where
+    playerWon = [uncurry translate (cellToScreen (x, y)) $ color blue $ rectangleWire 550 600 | x <- [1], y <-[ 1]]
+    aiWon = [uncurry translate (cellToScreen (x, y)) $ color green $ rectangleWire 550 600 | x <- [1], y <- [1]]
+    drawWon = [uncurry translate (cellToScreen (x, y)) $ color white $ rectangleWire 550 600 | x <- [1], y <- [1]]
+    
     grid = [uncurry translate (cellToScreen (x, y)) $ color black $ rectangleWire cellSize cellSize | x <- [0 .. fieldWidth - 1], y <- [0 .. fieldHeight - 1]]
     cells = [uncurry translate (cellToScreen (x, y)) $ drawCell x y | x <- [0 .. fieldWidth - 1], y <- [0 .. fieldHeight - 1]]
     drawCell x y = case Data.Map.lookup (x, y) field of
         Just ArrowCell         -> pictures [ color red $ rectangleSolid cellSize cellSize
-                                    , scale 0.4 0.4 $ color black $ text "->" --  bmp "arrow.bmp"
+                                    , scale 0.5 0.5 $ bmp "arrow.bmp"
                                     ]
         Just EmptyCell      -> pictures [ color red $ rectangleSolid cellSize cellSize
-                                    , scale 0.4 0.4 $ color red $ text "+" --bmp "empty.bmp"
+                                    , scale 0.5 0.5 $ bmp "empty.bmp"
                                     ]
         Just PlayerCell      -> pictures [ color yellow $ rectangleSolid cellSize cellSize
-                                    ,  scale 0.4 0.4 $ color green $ text "P" --bmp "white.bmp"
+                                    ,  scale 0.5 0.5 $ bmp "white.bmp"
                                     ]
         Just AiCell       -> pictures [ color yellow $ rectangleSolid cellSize cellSize
-                                    ,  scale 0.4 0.4 $ color blue $ text "A" --bmp "black.bmp"
+                                    ,  scale 0.5 0.5 $ bmp "black.bmp"
                                     ]
     --label = translate (-5) (-5) . scale 0.15 0.15 . color black . text
  
 viewPort = ViewPort (both (negate . (/ 2) . (subtract cellSize)) $ cellToScreen fieldSize) 0 1
+
+
+viewPort2 = ViewPort (both (negate . (/ 2) . (subtract 300)) $ cellToScreen fieldSize-50) 0 1
+
