@@ -25,7 +25,7 @@ data Winner = AI | Player | Draw
 type Field = [[FieldCell]]
 
 {- Turn -}
-data Turn = PlayerTurn | AiTurn
+data Turn = PlayerTurn | AiTurn | NoTurnPlayerWon | NoTurnAiWon | NoTurnDraw
   deriving (Show, Eq)
 
 {- Game State -}
@@ -221,6 +221,8 @@ field2fieldUI field = Data.Map.fromList $ (Data.Map.toList workField) ++ arrowLi
       where
         inserter (colNum, acc) col = (colNum + 1, Data.Map.insert (rowNum, colNum) col acc)
 
+getField :: GameState -> Field
+getField (GameState field _) = field
 
 -- Нужно инициализировать все, кроме стрелок(Nothing) на EmptyCell
 startGame :: StdGen -> IO ()
@@ -242,10 +244,31 @@ cellToScreen = both ((* cellSize) . fromIntegral)
 -- 		 далее вызов функции, которая ставит ход Ai (rendere)
 handler (EventKey (MouseButton LeftButton) Down _ mouse) gs@GS
     { field = field,
-       current_turn = current_turn
+       current_turn = PlayerTurn
     } 
     | snd coord == gameFieldHeight = --case Data.Map.lookup coord field of
-        let ngs = (makeMove (gsUI2gs gs) (Just $ fst coord)) in gs2gsUI $ makeMove ngs (alphaBetaSearch ngs 2)
+        let ngs = (makeMove (gsUI2gs gs) (Just $ fst coord)) in 
+          let mWinner = winner ngs in
+            if isNothing mWinner 
+            then
+              let ags = makeMove ngs (alphaBetaSearch ngs 2) in
+                let aWinner = winner ags in
+                  if isNothing aWinner 
+                  then
+                    gs2gsUI ags
+                  else
+                    case aWinner of
+                      Just Player -> gs { field = field2fieldUI $ getField ags, current_turn = NoTurnPlayerWon }
+                      Just AI     -> gs { field = field2fieldUI $ getField ags, current_turn = NoTurnAiWon }
+                      Just Draw   -> gs { field = field2fieldUI $ getField ags, current_turn = NoTurnDraw }
+                
+            else
+              case mWinner of
+                Just Player -> gs { field = field2fieldUI $ getField ngs, current_turn = NoTurnPlayerWon }
+                Just AI     -> gs { field = field2fieldUI $ getField ngs, current_turn = NoTurnAiWon }
+                Just Draw   -> gs { field = field2fieldUI $ getField ngs, current_turn = NoTurnDraw }
+                
+              
 	    --Nothing -> gs { 
         --  field = Data.Map.insert coord PlayerCell field, current_turn = AiTurn }
         --Just _ -> gs { 
