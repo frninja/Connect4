@@ -115,6 +115,63 @@ _skew :: Field -> Int -> Int -> Field
 _skew [] _ _ = []
 _skew (fc:fcs) leftgaps rightgaps = ((replicate leftgaps EmptyCell) ++ fc ++ (replicate rightgaps EmptyCell)) : _skew fcs (leftgaps+1) (rightgaps-1)
 
+eval :: GameState -> Int
+eval gs@(GameState field _) = _eval field $ winner gs    
+    
+_eval :: Field -> Maybe Winner -> Int
+_eval field (Nothing) = sum ( zipWith (*) foundation (Data.List.map mysum $ field))
+    where  
+        foundation = [1..((gameFieldWidth+1) `div` 2)] ++ (reverse [1..(gameFieldWidth `div` 2)])
+_eval _ (Just Draw) = 0    
+_eval _ (Just _) = (maxBound::Int) `div` 2
+
+--(depth, alpha, beta, move, failFast)
+type ABSearchData = (Int, Int, Int, Move, Bool)
+
+alphaBetaSearch :: GameState -> Int -> Maybe Move
+alphaBetaSearch gs depth
+  | length posMoves == 0 = Nothing
+  | depth <= 0 = Just $ head posMoves
+  | isNothing $ winner gs = Just move
+  | otherwise = Nothing
+  where
+    posMoves            = possibleMoves gs
+    bestMove            = if depth <= 0 then head posMoves else fromJust $ alphaBetaSearch gs $ depth - 1
+    moves               = bestMove : (Data.List.delete bestMove posMoves)
+    initABSDataVal      = (depth, (minBound::Int) `div` 4, (maxBound::Int) `div` 4, head moves, False)
+    foldABSData         = zip moves $ replicate (length moves) gs
+    (_, _, _, move, _)  = Data.List.foldl alphaBetaSearchUpdate initABSDataVal foldABSData
+    
+alphaBetaSearchUpdate :: ABSearchData -> (Move, GameState) -> ABSearchData
+alphaBetaSearchUpdate absdata@(_, _, _, _, True) _ = absdata
+alphaBetaSearchUpdate absdata@(depth, alpha, beta, bestMove, False) (move, gs)
+    | score >= beta = (depth, alpha, beta, move, True)
+    | score > alpha = (depth, score, beta, move, False)
+    | otherwise = absdata
+    where
+        score = -(alphaBetaSearchCalcScore (makeMove gs (Just move)) (-beta) (-alpha) (depth-1))
+        
+alphaBetaSearchCalcScore :: GameState -> Int -> Int -> Int -> Int
+alphaBetaSearchCalcScore gs@(GameState _ turn) _ _ 0 = (eval gs) * case turn of
+                                                                     AiTurn     -> -1
+                                                                     PlayerTurn -> 1
+alphaBetaSearchCalcScore gs alpha beta depth = val
+    where
+      posMoves          = possibleMoves gs
+      initVal           = (depth, alpha, beta, alpha, False)
+      toFold            = zip posMoves $ replicate (length posMoves) gs
+      (_, _, _, val, _) = Data.List.foldl alphaBetaSearchCalcScoreUpdate initVal toFold
+        
+--(depth, alpha, beta, returnVal, failFast)
+type AlphaBetaSearchCalcScoreData = (Int, Int, Int, Int, Bool)
+alphaBetaSearchCalcScoreUpdate :: AlphaBetaSearchCalcScoreData -> (Move, GameState) -> AlphaBetaSearchCalcScoreData
+alphaBetaSearchCalcScoreUpdate abscsdata@(_, _, _, _, True) _ = abscsdata
+alphaBetaSearchCalcScoreUpdate abscsdata@(depth, alpha, beta, returnVal, False) (move, gs)
+    | score >= beta = (depth, alpha, beta, score, True)
+    | score > alpha = (depth, score, beta, score, False)
+    | otherwise = abscsdata
+    where
+        score = -(alphaBetaSearchCalcScore (makeMove gs (Just move)) (-beta) (-alpha) (depth-1))
 
 main :: IO ()
 main = do
@@ -184,10 +241,11 @@ cellToScreen = both ((* cellSize) . fromIntegral)
 --		 проверка соответствующего столбца, поиск незанятой самой нижней ячейки и ее заполнение
 -- 		 далее вызов функции, которая ставит ход Ai (rendere)
 handler (EventKey (MouseButton LeftButton) Down _ mouse) gs@GS
-    { field = field
+    { field = field,
+       current_turn = current_turn
     } 
     | snd coord == gameFieldHeight = --case Data.Map.lookup coord field of
-        gs2gsUI $ makeMove (gsUI2gs gs) (Just $ fst coord)
+        let ngs = (makeMove (gsUI2gs gs) (Just $ fst coord)) in gs2gsUI $ makeMove ngs (alphaBetaSearch ngs 2)
 	    --Nothing -> gs { 
         --  field = Data.Map.insert coord PlayerCell field, current_turn = AiTurn }
         --Just _ -> gs { 
@@ -203,17 +261,17 @@ renderer GS { field = field } = applyViewPortToPicture viewPort $ pictures $ cel
     cells = [uncurry translate (cellToScreen (x, y)) $ drawCell x y | x <- [0 .. fieldWidth - 1], y <- [0 .. fieldHeight - 1]]
     drawCell x y = case Data.Map.lookup (x, y) field of
         Just ArrowCell         -> pictures [ color red $ rectangleSolid cellSize cellSize
-                                    , scale 0.4 0.4 $ bmp "arrow.bmp"
+                                    , scale 0.4 0.4 $ color black $ text "->" --  bmp "arrow.bmp"
                                     ]
         Just EmptyCell      -> pictures [ color red $ rectangleSolid cellSize cellSize
-                                    , scale 0.4 0.4 $ bmp "empty.bmp"
+                                    , scale 0.4 0.4 $ color red $ text "+" --bmp "empty.bmp"
                                     ]
         Just PlayerCell      -> pictures [ color yellow $ rectangleSolid cellSize cellSize
-                                    ,  scale 0.4 0.4 $ bmp "white.bmp"
+                                    ,  scale 0.4 0.4 $ color green $ text "P" --bmp "white.bmp"
                                     ]
         Just AiCell       -> pictures [ color yellow $ rectangleSolid cellSize cellSize
-                                    ,  scale 0.4 0.4 $ bmp "black.bmp"
+                                    ,  scale 0.4 0.4 $ color blue $ text "A" --bmp "black.bmp"
                                     ]
-    label = translate (-5) (-5) . scale 0.15 0.15 . color black . text
+    --label = translate (-5) (-5) . scale 0.15 0.15 . color black . text
  
 viewPort = ViewPort (both (negate . (/ 2) . (subtract cellSize)) $ cellToScreen fieldSize) 0 1
